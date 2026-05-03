@@ -6,4 +6,11 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-export default defineConfig();
+export default defineConfig({
+  cloudflare: false, // Disable Cloudflare specific build outputs
+  tanstackStart: {
+    server: {
+      preset: "vercel", // Tell Nitro/TanStack Start to output Vercel serverless functions
+    },
+  },
+});
