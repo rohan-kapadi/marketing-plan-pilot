@@ -69,11 +69,9 @@ npm run preview
 
 This project uses TanStack Start. For Vercel, the official deployment path is to use Nitro with TanStack Start.
 
-At the moment, this repo's [vite.config.ts](/abs/path/c:/Rohan/Projects/Lovable NxtWave project/marketing-plan-pilot/vite.config.ts) only contains:
+This repo now uses the Nitro Vite plugin for Vercel in [vite.config.ts](/abs/path/c:/Rohan/Projects/Lovable NxtWave project/marketing-plan-pilot/vite.config.ts).
 
-- `defineConfig()` from `@lovable.dev/vite-tanstack-config`
-
-It does **not** currently show an added Nitro plugin configuration. Before deploying to Vercel, make sure the app is configured for TanStack Start on Vercel with Nitro.
+If you still see `404: NOT_FOUND` on Vercel, it usually means the project was deployed before the Nitro config was added, or Vercel still has old build settings cached.
 
 ### Vercel deployment steps
 
@@ -89,12 +87,13 @@ It does **not** currently show an added Nitro plugin configuration. Before deplo
 
 ### Build settings
 
-Use these values unless your Vercel project auto-detects them correctly:
+Use these values in Vercel:
 
 - Install Command: `npm install`
 - Build Command: `npm run build`
+- Output Directory: leave empty
 
-If the project is configured as a Nitro/TanStack Start app, Vercel should handle the runtime based on that configuration.
+After changing the config, trigger a fresh redeploy from the newest commit.
 
 ## 7. Recommended deployment checklist
 
@@ -117,4 +116,4 @@ If the project is configured as a Nitro/TanStack Start app, Vercel should handle
 
 ## 9. Current repo status
 
-I was able to inspect the project, but I could not verify a build yet because dependencies are not installed in this workspace. Running `npm run build` currently fails with `vite is not recognized`, which is expected until `npm install` has been run.
+The project now builds locally with `npm run build`.
