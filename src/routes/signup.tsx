@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
+import * as authService from "@/services/auth.service";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -14,17 +15,34 @@ export const Route = createFileRoute("/signup")({
 function SignupPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
     const data = new FormData(e.currentTarget);
     const name = String(data.get("name") || "");
+    const email = String(data.get("email") || "");
+    const password = String(data.get("password") || "");
+    const company = String(data.get("company") || "");
+
     setLoading(true);
-    setTimeout(() => {
-      localStorage.setItem("stratifyr-user", JSON.stringify({ name }));
-      toast.success(`Welcome to Stratifyr, ${name.split(" ")[0]}!`);
+    try {
+      await authService.signUp({
+        email,
+        password,
+        fullName: name,
+        companyName: company || undefined,
+      });
+      toast.success(`Welcome to Stratifyr, ${name.split(" ")[0]}! Check your email to confirm your account.`);
       navigate({ to: "/dashboard" });
-    }, 500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sign up failed.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,18 +70,32 @@ function SignupPage() {
           <p className="mt-2 text-sm text-muted-foreground">Free forever for your first plan.</p>
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" name="name" placeholder="Alex Doe" required />
+              <Label htmlFor="signup-name">Full name</Label>
+              <Input id="signup-name" name="name" placeholder="Alex Doe" required autoComplete="name" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="you@company.com" required />
+              <Label htmlFor="signup-company">Company (optional)</Label>
+              <Input id="signup-company" name="company" placeholder="Acme Inc." autoComplete="organization" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" placeholder="At least 8 characters" minLength={8} required />
+              <Label htmlFor="signup-email">Email</Label>
+              <Input id="signup-email" name="email" type="email" placeholder="yourname@gmail.com" required autoComplete="email" />
+              <p className="text-xs text-muted-foreground">
+                Use a personal email — addresses like "admin@…", "root@…", or "noreply@…" are blocked by the auth provider.
+              </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-password">Password</Label>
+              <Input id="signup-password" name="password" type="password" placeholder="At least 6 characters" minLength={6} required autoComplete="new-password" />
+            </div>
+            {error && (
+              <div id="signup-error" className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2.5 space-y-1">
+                <p className="text-sm text-destructive font-medium">Sign up failed</p>
+                <p className="text-sm text-destructive/90">{error}</p>
+              </div>
+            )}
             <Button
+              id="signup-submit"
               type="submit"
               className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90"
               disabled={loading}

@@ -1,0 +1,31 @@
+-- ============================================================
+-- Stratifyr — Seed / Sample Data
+-- Run AFTER 001_initial_schema.sql and AFTER creating a user
+-- Replace the UUID below with a real auth.users id
+-- ============================================================
+
+-- Example: create a plan + allocations + activities for a user
+-- DO $$ DECLARE
+--   v_user_id uuid := 'REPLACE-WITH-REAL-USER-UUID';
+--   v_plan_id uuid;
+-- BEGIN
+--   -- Insert plan
+--   INSERT INTO public.budget_plans (user_id, title, total_budget, period_start, period_end)
+--   VALUES (v_user_id, 'May Marketing Plan', 2000, '2026-05-01', '2026-05-31')
+--   RETURNING id INTO v_plan_id;
+--
+--   -- Insert allocations
+--   INSERT INTO public.budget_allocations (plan_id, channel, amount) VALUES
+--     (v_plan_id, 'Ads',     800),
+--     (v_plan_id, 'Content', 600),
+--     (v_plan_id, 'Tools',   200),
+--     (v_plan_id, 'Events',  200),
+--     (v_plan_id, 'SEO',     200);
+--
+--   -- Insert activities
+--   INSERT INTO public.activities (plan_id, user_id, title, channel, activity_date, budget, status) VALUES
+--     (v_plan_id, v_user_id, 'Google Ads campaign',      'Ads',     CURRENT_DATE,       400, 'Planned'),
+--     (v_plan_id, v_user_id, 'Blog post: Local SEO guide','Content', CURRENT_DATE + 3,  150, 'Planned'),
+--     (v_plan_id, v_user_id, 'Instagram boost campaign',  'Ads',     CURRENT_DATE + 7,  200, 'Planned'),
+--     (v_plan_id, v_user_id, 'Weekly Reels production',   'Content', CURRENT_DATE + 10, 200, 'Planned');
+-- END $$;

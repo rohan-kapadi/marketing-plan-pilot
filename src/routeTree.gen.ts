@@ -15,6 +15,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardTemplatesRouteImport } from './routes/dashboard.templates'
+import { Route as DashboardDataRouteImport } from './routes/dashboard.data'
 import { Route as DashboardCalendarRouteImport } from './routes/dashboard.calendar'
 import { Route as DashboardBudgetRouteImport } from './routes/dashboard.budget'
 
@@ -48,6 +49,11 @@ const DashboardTemplatesRoute = DashboardTemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardDataRoute = DashboardDataRouteImport.update({
+  id: '/data',
+  path: '/data',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCalendarRoute = DashboardCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/dashboard/budget': typeof DashboardBudgetRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
+  '/dashboard/data': typeof DashboardDataRoute
   '/dashboard/templates': typeof DashboardTemplatesRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/dashboard/budget': typeof DashboardBudgetRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
+  '/dashboard/data': typeof DashboardDataRoute
   '/dashboard/templates': typeof DashboardTemplatesRoute
   '/dashboard': typeof DashboardIndexRoute
 }
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/dashboard/budget': typeof DashboardBudgetRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
+  '/dashboard/data': typeof DashboardDataRoute
   '/dashboard/templates': typeof DashboardTemplatesRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard/budget'
     | '/dashboard/calendar'
+    | '/dashboard/data'
     | '/dashboard/templates'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard/budget'
     | '/dashboard/calendar'
+    | '/dashboard/data'
     | '/dashboard/templates'
     | '/dashboard'
   id:
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard/budget'
     | '/dashboard/calendar'
+    | '/dashboard/data'
     | '/dashboard/templates'
     | '/dashboard/'
   fileRoutesById: FileRoutesById
@@ -172,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardTemplatesRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/data': {
+      id: '/dashboard/data'
+      path: '/data'
+      fullPath: '/dashboard/data'
+      preLoaderRoute: typeof DashboardDataRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/calendar': {
       id: '/dashboard/calendar'
       path: '/calendar'
@@ -192,6 +211,7 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteChildren {
   DashboardBudgetRoute: typeof DashboardBudgetRoute
   DashboardCalendarRoute: typeof DashboardCalendarRoute
+  DashboardDataRoute: typeof DashboardDataRoute
   DashboardTemplatesRoute: typeof DashboardTemplatesRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
@@ -199,6 +219,7 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBudgetRoute: DashboardBudgetRoute,
   DashboardCalendarRoute: DashboardCalendarRoute,
+  DashboardDataRoute: DashboardDataRoute,
   DashboardTemplatesRoute: DashboardTemplatesRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
@@ -216,3 +237,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

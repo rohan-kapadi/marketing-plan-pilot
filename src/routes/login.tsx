@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
+import * as authService from "@/services/auth.service";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -14,14 +15,27 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError(null);
+    const data = new FormData(e.currentTarget);
+    const email = String(data.get("email") || "");
+    const password = String(data.get("password") || "");
+
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await authService.signIn({ email, password });
       toast.success("Welcome back!");
       navigate({ to: "/dashboard" });
-    }, 500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sign in failed.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,14 +65,20 @@ function LoginPage() {
           </p>
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@company.com" required />
+              <Label htmlFor="login-email">Email</Label>
+              <Input id="login-email" name="email" type="email" placeholder="you@company.com" required autoComplete="email" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="••••••••" required />
+              <Label htmlFor="login-password">Password</Label>
+              <Input id="login-password" name="password" type="password" placeholder="••••••••" required autoComplete="current-password" />
             </div>
+            {error && (
+              <p id="login-error" className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">
+                {error}
+              </p>
+            )}
             <Button
+              id="login-submit"
               type="submit"
               className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90"
               disabled={loading}

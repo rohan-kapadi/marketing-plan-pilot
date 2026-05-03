@@ -1,76 +1,22 @@
-import { useEffect, useState } from "react";
-
+// ── Domain Types ──────────────────────────────────────────────
 export type Channel = "Ads" | "Content" | "Tools" | "Events" | "SEO";
 export const CHANNELS: Channel[] = ["Ads", "Content", "Tools", "Events", "SEO"];
 
-export type Activity = {
-  id: string;
-  title: string;
-  channel: Channel;
-  date: string; // YYYY-MM-DD
-  budget: number;
-  status: "Planned" | "Completed";
-};
-
 export type Allocation = Partial<Record<Channel, number>>;
 
-export type AppState = {
-  totalBudget: number;
-  allocations: Allocation;
-  activities: Activity[];
-};
-
-const KEY = "stratifyr-state-v1";
-
-const DEFAULT: AppState = {
-  totalBudget: 2000,
-  allocations: { Ads: 800, Content: 600, Tools: 200, Events: 200, SEO: 200 },
-  activities: [
-    {
-      id: "a1",
-      title: "Google Ads campaign",
-      channel: "Ads",
-      date: new Date().toISOString().slice(0, 10),
-      budget: 400,
-      status: "Planned",
-    },
-    {
-      id: "a2",
-      title: "Blog post: Local SEO guide",
-      channel: "Content",
-      date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
-      budget: 150,
-      status: "Planned",
-    },
-  ],
-};
-
-export function useAppState() {
-  const [state, setState] = useState<AppState>(DEFAULT);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setState(JSON.parse(raw));
-    } catch {}
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (ready) localStorage.setItem(KEY, JSON.stringify(state));
-  }, [state, ready]);
-
-  return { state, setState, ready };
-}
-
+// ── Templates ─────────────────────────────────────────────────
 export type Template = {
   id: string;
   name: string;
   description: string;
   emoji: string;
   allocations: Allocation;
-  activities: Omit<Activity, "id" | "date">[];
+  activities: {
+    title: string;
+    channel: Channel;
+    budget: number;
+    status: "Planned" | "Completed";
+  }[];
 };
 
 export const TEMPLATES: Template[] = [
@@ -112,5 +58,6 @@ export const TEMPLATES: Template[] = [
   },
 ];
 
+// ── Formatter ─────────────────────────────────────────────────
 export const fmt = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });

@@ -1,39 +1,72 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useAppState, fmt, CHANNELS, type Channel, type Activity } from "@/lib/store";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Trash2, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { BusinessSelector } from "@/components/data/BusinessSelector";
+import { ActivityForm, type ActivityFormValues } from "@/components/data/ActivityForm";
+import { useAuthContext } from "@/lib/auth-context";
+import { useBusinesses } from "@/hooks/useBusinesses";
+import { usePlans, useCreatePlan } from "@/hooks/usePlans";
+import {
+  useActivities,
+  useCreateActivity,
+  useDeleteActivity,
+  useToggleActivityStatus,
+} from "@/hooks/useActivities";
+import { fmt } from "@/lib/store";
+import { planMonthLabel } from "@/services/budget.service";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
 });
 
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
 function CalendarPage() {
-  const { state, setState } = useAppState();
-  const [month, setMonth] = useState(startOfMonth(new Date()));
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<Omit<Activity, "id">>({
-    title: "",
-    channel: "Ads",
-    date: new Date().toISOString().slice(0, 10),
-    budget: 0,
-    status: "Planned",
-  });
+  const { user } = useAuthContext();
+  const userId = user?.id ?? "";
+
+  const { data: businesses = [] } = useBusinesses(userId);
+  const [selectedBizId, setSelectedBizId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedBizId && businesses.length > 0) {
+      setSelectedBizId(businesses[0].id);
+    }
+  }, [businesses, selectedBizId]);
+
+  const { data: plans = [] } = usePlans(selectedBizId ?? undefined);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedPlanId && plans.length > 0) {
+      setSelectedPlanId(plans[0].id);
+    }
+  }, [plans, selectedPlanId]);
+
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId);
+  const month = selectedPlan ? new Date(selectedPlan.year, selectedPlan.month - 1, 1) : new Date();
+
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+
+  const { data: activitiesResult, isLoading } = useActivities(
+    selectedPlanId ?? undefined,
+    { dateFrom: `${monthKey}-01`, dateTo: `${monthKey}-31` },
+    { column: "activity_date", ascending: true }
+  );
+
+  const createPlan = useCreatePlan(selectedBizId ?? "");
+  const createMutation = useCreateActivity(selectedPlanId ?? "");
+  const deleteMutation = useDeleteActivity(selectedPlanId ?? "");
+  const toggleMutation = useToggleActivityStatus(selectedPlanId ?? "");
+
+  const monthActivities = activitiesResult?.data ?? [];
 
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const firstDay = month.getDay();
@@ -41,29 +74,52 @@ function CalendarPage() {
     i < firstDay ? null : i - firstDay + 1
   );
 
-  const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-  const monthActivities = state.activities.filter((a) => a.date.startsWith(monthKey));
-
-  const addActivity = () => {
-    if (!draft.title.trim()) return;
-    setState((s) => ({
-      ...s,
-      activities: [...s.activities, { ...draft, id: crypto.randomUUID() }],
-    }));
-    setOpen(false);
-    setDraft({ ...draft, title: "", budget: 0 });
+  const handleCreateMonth = async () => {
+    if (!selectedBizId) return;
+    const now = new Date();
+    try {
+      const p = await createPlan.mutateAsync({
+        business_id: selectedBizId,
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+      });
+      setSelectedPlanId(p.id);
+      toast.success("Created plan for this month!");
+    } catch (err) {
+      toast.error("Failed to create month plan.");
+    }
   };
 
-  const removeActivity = (id: string) =>
-    setState((s) => ({ ...s, activities: s.activities.filter((a) => a.id !== id) }));
+  const handleCreate = async (values: ActivityFormValues) => {
+    if (!selectedPlanId) return;
+    try {
+      await createMutation.mutateAsync({
+        ...values,
+        plan_id: selectedPlanId,
+      });
+      toast.success("Activity added!");
+      setCreateOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add activity.");
+    }
+  };
 
-  const toggleStatus = (id: string) =>
-    setState((s) => ({
-      ...s,
-      activities: s.activities.map((a) =>
-        a.id === id ? { ...a, status: a.status === "Planned" ? "Completed" : "Planned" } : a
-      ),
-    }));
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success("Activity removed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete activity.");
+    }
+  };
+
+  const handleToggle = async (id: string, status: "Planned" | "Completed") => {
+    try {
+      await toggleMutation.mutateAsync({ id, status });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status.");
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -72,132 +128,92 @@ function CalendarPage() {
           <h1 className="text-3xl md:text-4xl font-bold">Marketing Calendar</h1>
           <p className="mt-1 text-muted-foreground">Schedule and track every activity.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
-            ←
+        <div className="flex flex-wrap items-center gap-2">
+          <BusinessSelector userId={userId} selectedBusinessId={selectedBizId} onSelect={(id) => { setSelectedBizId(id); setSelectedPlanId(null); }} />
+          {plans.length > 0 ? (
+            <Select value={selectedPlanId ?? ""} onValueChange={setSelectedPlanId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {plans.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{planMonthLabel(p)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Button variant="outline" size="sm" onClick={handleCreateMonth} disabled={!selectedBizId || createPlan.isPending}>
+              Create Plan for {new Date().toLocaleString("en", { month: "long" })}
+            </Button>
+          )}
+          <Button
+            id="cal-add-activity"
+            className="bg-gradient-primary text-primary-foreground hover:opacity-90 ml-2"
+            onClick={() => setCreateOpen(true)}
+            disabled={!selectedPlanId}
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add activity
           </Button>
-          <span className="font-display font-semibold w-36 text-center">
-            {month.toLocaleString("en", { month: "long", year: "numeric" })}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
-            →
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-primary text-primary-foreground hover:opacity-90 ml-2">
-                <Plus className="h-4 w-4 mr-1" /> Add activity
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New activity</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Title</Label>
-                  <Input
-                    value={draft.title}
-                    onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                    placeholder="Instagram boost campaign"
-                    className="mt-1.5"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Channel</Label>
-                    <Select
-                      value={draft.channel}
-                      onValueChange={(v) => setDraft({ ...draft, channel: v as Channel })}
-                    >
-                      <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CHANNELS.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Date</Label>
-                    <Input
-                      type="date"
-                      value={draft.date}
-                      onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                      className="mt-1.5"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Budget</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={draft.budget}
-                    onChange={(e) => setDraft({ ...draft, budget: Number(e.target.value) || 0 })}
-                    className="mt-1.5"
-                  />
-                </div>
-                <Button onClick={addActivity} className="w-full bg-gradient-primary text-primary-foreground">
-                  Add to calendar
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
+      {/* Calendar grid */}
       <div className="rounded-2xl border border-border/60 bg-card p-4 overflow-x-auto">
         <div className="grid grid-cols-7 gap-1 min-w-[700px]">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div key={d} className="text-xs font-semibold text-muted-foreground p-2 text-center">
-              {d}
-            </div>
+            <div key={d} className="text-xs font-semibold text-muted-foreground p-2 text-center">{d}</div>
           ))}
-          {cells.map((day, i) => {
-            if (!day) return <div key={i} className="aspect-square rounded-lg bg-transparent" />;
-            const ds = `${monthKey}-${String(day).padStart(2, "0")}`;
-            const dayActs = monthActivities.filter((a) => a.date === ds);
-            return (
-              <div
-                key={i}
-                className="aspect-square min-h-[80px] rounded-lg border border-border/60 p-1.5 flex flex-col gap-1 hover:bg-secondary/40 transition-colors"
-              >
-                <span className="text-xs font-medium text-muted-foreground">{day}</span>
-                {dayActs.slice(0, 2).map((a) => (
+          {!selectedPlanId ? (
+             <div className="col-span-7 p-10 text-center text-muted-foreground border-t border-border/40 mt-2">
+               Select or create a month plan to view the calendar.
+             </div>
+          ) : isLoading ? (
+            Array.from({ length: 35 }).map((_, i) => (
+              <div key={i} className="aspect-square min-h-[80px] rounded-lg border border-border/40 bg-muted/20 animate-pulse" />
+            ))
+          ) : cells.map((day, i) => {
+                if (!day) return <div key={i} className="aspect-square rounded-lg bg-transparent" />;
+                const ds = `${monthKey}-${String(day).padStart(2, "0")}`;
+                const dayActs = monthActivities.filter((a) => a.activity_date === ds);
+                return (
                   <div
-                    key={a.id}
-                    className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium ${
-                      a.status === "Completed"
-                        ? "bg-success/20 text-success-foreground line-through"
-                        : "bg-primary/20 text-foreground"
-                    }`}
-                    title={a.title}
+                    key={i}
+                    className="aspect-square min-h-[80px] rounded-lg border border-border/60 p-1.5 flex flex-col gap-1 hover:bg-secondary/40 transition-colors"
                   >
-                    {a.title}
+                    <span className="text-xs font-medium text-muted-foreground">{day}</span>
+                    {dayActs.slice(0, 2).map((a) => (
+                      <div
+                        key={a.id}
+                        className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium ${
+                          a.status === "Completed"
+                            ? "bg-success/20 text-success-foreground line-through"
+                            : "bg-primary/20 text-foreground"
+                        }`}
+                        title={a.title}
+                      >
+                        {a.title}
+                      </div>
+                    ))}
+                    {dayActs.length > 2 && (
+                      <div className="text-[10px] text-muted-foreground">+{dayActs.length - 2}</div>
+                    )}
                   </div>
-                ))}
-                {dayActs.length > 2 && (
-                  <div className="text-[10px] text-muted-foreground">+{dayActs.length - 2}</div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
         </div>
       </div>
 
+      {/* Activity list */}
       <div>
         <h2 className="text-lg font-semibold mb-4">All activities ({monthActivities.length})</h2>
         <div className="space-y-2">
-          {monthActivities.length === 0 && (
+          {monthActivities.length === 0 && !isLoading && (
             <p className="text-sm text-muted-foreground">No activities planned for this month.</p>
           )}
           {monthActivities.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center gap-4 rounded-xl border border-border/60 bg-card p-4"
-            >
+            <div key={a.id} className="flex items-center gap-4 rounded-xl border border-border/60 bg-card p-4">
               <button
-                onClick={() => toggleStatus(a.id)}
+                onClick={() => handleToggle(a.id, a.status)}
                 className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-colors ${
                   a.status === "Completed"
                     ? "bg-primary border-primary"
@@ -216,18 +232,39 @@ function CalendarPage() {
                   {a.title}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(a.date).toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" })}
+                  {new Date(a.activity_date).toLocaleDateString("en", { weekday: "short", month: "short", day: "numeric" })}
                 </p>
               </div>
               <Badge variant="secondary">{a.channel}</Badge>
-              <span className="text-sm font-medium tabular-nums">{fmt(a.budget)}</span>
-              <Button variant="ghost" size="icon" onClick={() => removeActivity(a.id)}>
+              <span className="text-sm font-medium tabular-nums">{fmt(a.budget_used)}</span>
+              <Button
+                id={`cal-delete-${a.id}`}
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDelete(a.id)}
+                disabled={deleteMutation.isPending}
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New activity</DialogTitle>
+          </DialogHeader>
+          <ActivityForm
+            defaultValues={{ activity_date: `${monthKey}-01` }}
+            onSubmit={handleCreate}
+            onCancel={() => setCreateOpen(false)}
+            submitLabel="Add to calendar"
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
