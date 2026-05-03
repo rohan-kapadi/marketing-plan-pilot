@@ -11,9 +11,9 @@ export const Route = createFileRoute("/dashboard")({
 
 const items = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/dashboard/budget", label: "Budget", icon: PieChart },
-  { to: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/dashboard/templates", label: "Templates", icon: Sparkles },
+  { to: "/dashboard/budget", label: "Budget", icon: PieChart, exact: false },
+  { to: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, exact: false },
+  { to: "/dashboard/templates", label: "Templates", icon: Sparkles, exact: false },
 ] as const;
 
 function DashboardLayout() {
